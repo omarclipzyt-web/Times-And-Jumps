@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Times and Jumps</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<style>
+html,body{margin:0;overflow:hidden;background:#103010;font-family:sans-serif;user-select:none;touch-action:none}
+#menu{position:fixed;inset:0;background:#0c240c;color:white;display:flex;flex-direction:column;align-items:center;justify-content:center}
+#menu h1{color:#00ff66;font-size:40px;margin-bottom:20px}
+.level{background:#111;border:1px solid #00ff66;padding:15px 30px;margin:10px;border-radius:10px}
+.level small{display:block;color:#aaa;font-size:12px;text-align:center}
+#ui{position:fixed;top:0;left:0;width:100%;height:50px;background:#111;display:flex;align-items:center;padding:0 10px;gap:10px}
+#back{background:#222;color:white;border:1px solid #555;border-radius:6px;padding:6px 10px}
+#title{color:#00ff66;font-weight:bold}
+#barWrap{flex:1;height:12px;background:#222;border-radius:10px;overflow:hidden}
+#bar{height:100%;width:100%;background:#00ff66;transition:width .1s}
+canvas{display:none}
+</style>
+</head>
+<body>
+
+<div id="menu">
+ <h1>Times and Jumps</h1>
+ <div class="level" onclick="startLevel(0)">Green Hills<small>Difficulty: Easy</small></div>
+ <div class="level" onclick="startLevel(1)">Sky Rush<small>Difficulty: Medium</small></div>
+ <div class="level" onclick="startLevel(2)">Night Sprint<small>Difficulty: Hard</small></div>
+</div>
+
+<div id="ui">
+ <button id="back" onclick="goHome()">Back</button>
+ <div id="title"></div>
+ <div id="barWrap"><div id="bar"></div></div>
+</div>
+
+<canvas id="c"></canvas>
+
+<script>
+const canvas=document.getElementById("c");
+const ctx=canvas.getContext("2d");
+function resize(){canvas.width=innerWidth;canvas.height=innerHeight;}
+window.onresize=resize;
+
+let cube,gravity=0.85,jumpPower=-14,speed,distance,ending=false,wallX;
+let obstacles=[],currentLevel;
+
+const levels=[
+ {name:"Green Hills",speed:4.2,pattern:[
+  ["block",400],["spike",700],["block",950],["spike",1200],["block",1450]
+ ]},
+ {name:"Sky Rush",speed:4.8,pattern:[
+  ["spike",400],["block",650],["spike",850],["block",1100],["spike",1300],["block",1550]
+ ]},
+ {name:"Night Sprint",speed:5.0,pattern:[   // tuned ↓
+  ["spike",350],
+  ["block",520],
+  ["spike",740],
+  ["spike",950],
+  ["block",1150],
+  ["spike",1350],
+  ["block",1550]
+ ]}
+];
+
+function startLevel(i){
+ currentLevel=levels[i];
+ speed=currentLevel.speed;
+ distance=0;
+ ending=false;
+ wallX=canvas.width+200;
+ obstacles=currentLevel.pattern.map(p=>({type:p[0],x:p[1]}));
+ cube={x:120,y:0,w:40,h:40,vy:0,onGround:false};
+
+ document.getElementById("menu").style.display="none";
+ document.getElementById("ui").style.display="flex";
+ document.getElementById("title").textContent=currentLevel.name;
+ canvas.style.display="block";
+ resize();
+}
+
+function goHome(){
+ document.getElementById("menu").style.display="flex";
+ document.getElementById("ui").style.display="none";
+ canvas.style.display="none";
+}
+
+document.addEventListener("touchstart",jump);
+document.addEventListener("mousedown",jump);
+
+function jump(){
+ if(cube.onGround && !ending){
+  cube.vy=jumpPower;
+  cube.onGround=false;
+ }
+}
+
+function loop(){
+ requestAnimationFrame(loop);
+ if(canvas.style.display==="none") return;
+
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+ ctx.fillStyle="#1f5f1f";
+ ctx.fillRect(0,canvas.height-60,canvas.width,60);
+
+ cube.vy+=gravity;
+ cube.y+=cube.vy;
+ if(cube.y+cube.h>=canvas.height-60){
+  cube.y=canvas.height-60-cube.h;
+  cube.vy=0;
+  cube.onGround=true;
+ }
+
+ ctx.fillStyle="#00ff66";
+ ctx.fillRect(cube.x,cube.y,cube.w,cube.h);
+
+ for(let o of obstacles){
+  let dx=o.x-distance;
+
+  if(o.type==="spike"){
+   let y=canvas.height-60;
+   ctx.fillStyle="#000";
+   ctx.beginPath();
+   ctx.moveTo(dx,y);
+   ctx.lineTo(dx+40,y);
+   ctx.lineTo(dx+20,y-40);
+   ctx.closePath();
+   ctx.fill();
+   if(hit(dx,y-40,40,40)) return startLevel(0);
+  }
+
+  if(o.type==="block"){
+   let h=60,dy=canvas.height-60-h;
+   ctx.fillStyle="#777";
+   ctx.fillRect(dx,dy,50,h);
+   if(hit(dx,dy,50,h)){
+    if(cube.vy>0 && cube.y+cube.h-cube.vy<=dy){
+     cube.y=dy-cube.h; cube.vy=0; cube.onGround=true;
+    } else return startLevel(0);
+   }
+  }
+ }
+
+ distance+=speed;
+ if(distance>1800) ending=true;
+
+ if(ending){
+  ctx.fillStyle="#222";
+  ctx.fillRect(wallX,0,200,canvas.height);
+  wallX-=6;
+  if(wallX<cube.x){
+   cube.x+=2; cube.y+=2; cube.w*=0.97; cube.h*=0.97;
+   if(cube.w<5) goHome();
+  }
+ }
+
+ document.getElementById("bar").style.width=Math.max(0,(1-distance/1800)*100)+"%";
+}
+
+function hit(x,y,w,h){
+ return cube.x < x+w && cube.x+cube.w > x &&
+        cube.y < y+h && cube.y+cube.h > y;
+}
+
+loop();
+</script>
+
+</body>
+</html>
